@@ -14,3 +14,7 @@ Run `bin/cncjs-pendant-keyboard` to start. Pass --help to `cncjs-pendant-keyboar
 ```
 bin/cncjs-pendant-keyboard --help
 ```
+
+Hotkeys:
+
+![Hotkeys](https://raw.githubusercontent.com/nsfilho/cncjs-pendant-keyboard/master/docs/keysinfo.png)
