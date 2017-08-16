@@ -1,0 +1,40 @@
+{
+  "name": "cncjs-pendant-keyboard",
+  "version": "0.1.0",
+  "description": "A simple keyboard pendant for cncjs.",
+  "main": "./index.js",
+  "engines": {
+    "node": ">=4"
+  },
+  "bin": {
+    "cncjs-pendant-boilerplate": "./bin/cncjs-pendant-keyboard"
+  },
+  "preferGlobal": true,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nsfilho/cncjs-pendant-keyboard.git"
+  },
+  "keywords": [
+    "cncjs",
+    "pendant",
+    "keyboard"
+  ],
+  "author": "Nelio Santos <nelio@e01aio.com.br>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/nsfilho/cncjs-pendant-keyboard/issues"
+  },
+  "homepage": "https://github.com/nsfilho/cncjs-pendant-keyboard#readme",
+  "dependencies": {
+    "commander": "^2.9.0",
+    "inquirer": "^3.0.1",
+    "jsonwebtoken": "^7.2.1",
+    "lodash.get": "^4.4.2",
+    "serialport": "^4.0.7",
+    "socket.io-client": "^1.7.2",
+    "vorpal": "^1.11.4"
+  }
+}
