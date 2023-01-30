@@ -4,7 +4,7 @@ var fs = require("fs");
 var path = require("path");
 var program = require("commander");
 var serialport = require("serialport");
-var inquirer = require("inquirer");
+var inquirer = import("inquirer");
 var pkg = require("../package.json");
 var serverMain = require("../index");
 var hid = require("node-hid");
@@ -86,53 +86,61 @@ var kbdevent = {
     default_move: 1 // Alter by F1, F2, F3
 };
 
+//console.log(hid.devices())
+
 var createServer = function(options) {
-    serverMain(options, function(err, socket) {
-        // Grbl
-        socket.on("Grbl:state", function(state) {
-            store.controller.state = state;
-        });
-        socket.on("Grbl:settings", function(settings) {
-            store.controller.settings = settings;
-        });
+    serverMain(options, function(err, socket, options) {
+        if(socket) {
+            // Grbl
+            socket.on("Grbl:state", function(state) {
+                store.controller.state = state;
+            });
+            socket.on("Grbl:settings", function(settings) {
+                store.controller.settings = settings;
+            });
 
-        // Smoothie
-        socket.on("Smoothie:state", function(state) {
-            store.controller.state = state;
-        });
-        socket.on("Smoothie:settings", function(settings) {
-            store.controller.settings = settings;
-        });
+            // Smoothie
+            socket.on("Smoothie:state", function(state) {
+                store.controller.state = state;
+            });
+            socket.on("Smoothie:settings", function(settings) {
+                store.controller.settings = settings;
+            });
 
-        // TinyG
-        socket.on("TinyG:state", function(state) {
-            store.controller.state = state;
-        });
-        socket.on("TinyG:settings", function(settings) {
-            store.controller.settings = settings;
-        });
+            // TinyG
+            socket.on("TinyG:state", function(state) {
+                store.controller.state = state;
+            });
+            socket.on("TinyG:settings", function(settings) {
+                store.controller.settings = settings;
+            });
 
-        // Sender
-        socket.on("sender:status", function(data) {
-            store.sender.status = data;
-        });
+            // Sender
+            socket.on("sender:status", function(data) {
+                store.sender.status = data;
+            });
+        }
+
+        
 
         const findPath = interface =>
             hid
                 .devices()
                 .find(
                     item =>
-                        item.vendorId === 26881 &&
-                        item.productId === 9985 &&
+                        item.vendorId === 1578 &&
+                        item.productId === 16641 &&
                         item.interface === interface
                 ).path;
 
-        console.log("Keyboard HID Address:", findPath(0), " & ", findPath(1));
+        //console.log("Keyboard HID Address:", findPath(0), " & ", findPath(1));
         var keyboard_main = new hid.HID(findPath(0));
         var keyboard_extra = new hid.HID(findPath(1));
+        console.log("here");
 
         keyboard_main.on("data", function(data) {
-            var recv = data.toJSON().data;
+            console.log(data);
+           /* var recv = data.toJSON().data;
             var bits = recv.shift();
             kbdevent.l_control = (bits & 1) !== 0;
             kbdevent.l_shift = (bits & 2) !== 0;
@@ -145,18 +153,19 @@ var createServer = function(options) {
             recv.shift();
             kbdevent.key = recv.shift();
             kbdevent.repeating = 0;
-            sendToController();
+            sendToController();*/
         });
 
         keyboard_extra.on("data", function(data) {
-            var recv = data.toJSON().data;
+            console.log(data);
+            /*var recv = data.toJSON().data;
             recv.shift();
             kbdevent.extra = recv.shift();
             kbdevent.repeating = 0;
-            sendToController();
+            sendToController();*/
         });
 
-        function sendToController() {
+        /*function sendToController() {
             // Calculate move size modifiers
             kbdevent.move = kbdevent.default_move;
             if (kbdevent.l_alt || kbdevent.r_alt) {
@@ -268,19 +277,20 @@ var createServer = function(options) {
             }
 
             console.log(kbdevent);
-        }
+        }*/
     });
 };
 
 // console.log('List of connected devices (paths): ');
 // console.log('devices:', hid.devices());
 
-if (options.port) {
+if (true || options.port) {
     createServer(options);
     return;
 }
 
-serialport.list(function(err, ports) {
+/*
+serialport.SerialPort.list(function(err, ports) {
     if (err) {
         console.error(err);
         process.exit(1);
@@ -303,4 +313,4 @@ serialport.list(function(err, ports) {
 
             createServer(options);
         });
-});
+});*/

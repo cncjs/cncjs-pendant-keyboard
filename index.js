@@ -33,14 +33,17 @@ module.exports = function(options, callback) {
         try {
             const config = JSON.parse(fs.readFileSync(cncrc, 'utf8'));
             options.secret = config.secret;
+            options.keyboards = config.keyboards;
         } catch (err) {
             console.error(err);
             process.exit(1);
         }
     }
 
-    const token = generateAccessToken({ id: '', name: 'cncjs-pendant' }, options.secret, options.accessTokenLifetime);
+    const token = "";//generateAccessToken({ id: '', name: 'cncjs-pendant' }, options.secret, options.accessTokenLifetime);
     const url = 'ws://' + options.socketAddress + ':' + options.socketPort + '?token=' + token;
+
+    callback(null, null, options.keyboards);
 
     socket = io.connect('ws://' + options.socketAddress + ':' + options.socketPort, {
         'query': 'token=' + token
@@ -73,11 +76,11 @@ module.exports = function(options, callback) {
 
         console.log('Connected to port "' + options.port + '" (Baud rate: ' + options.baudrate + ')');
 
-        callback(null, socket);
+        callback(null, socket, options.keyboards);
     });
 
     socket.on('serialport:error', function(options) {
-        callback(new Error('Error opening serial port "' + options.port + '"'));
+        callback(new Error('Error opening serial port "' + options.port + '"'), null, options.keyboards);
     });
 
     socket.on('serialport:read', function(data) {
