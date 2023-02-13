@@ -4,7 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const io = require('socket.io-client');
 const jwt = require('jsonwebtoken');
-const get = require('lodash.get');
+const get = require('lodash/get');
+const keyboardConfigurator = require('./keyboardConfigurator');
 
 const generateAccessToken = function(payload, secret, expiration) {
     const token = jwt.sign(payload, secret, {
@@ -23,7 +24,7 @@ module.exports = function(options, callback) {
     options = options || {};
     options.secret = get(options, 'secret', process.env['CNCJS_SECRET']);
     options.baudrate = get(options, 'baudrate', 115200);
-    options.socketAddress = get(options, 'socketAddress', 'localhost');
+    options.socketAddress = get(options, 'socketAddress', '127.0.0.1');
     options.socketPort = get(options, 'socketPort', 8000);
     options.controllerType = get(options, 'controllerType', 'Grbl');
     options.accessTokenLifetime = get(options, 'accessTokenLifetime', '30d');
@@ -39,11 +40,16 @@ module.exports = function(options, callback) {
             process.exit(1);
         }
     }
+    
 
-    const token = "";//generateAccessToken({ id: '', name: 'cncjs-pendant' }, options.secret, options.accessTokenLifetime);
+    const token = generateAccessToken({ id: '', name: 'cncjs-pendant' }, options.secret, options.accessTokenLifetime);
     const url = 'ws://' + options.socketAddress + ':' + options.socketPort + '?token=' + token;
 
-    callback(null, null, options.keyboards);
+    var keyboards = options.keyboards;
+    keyboards = keyboardConfigurator(keyboards);
+    if(!keyboards) {
+        return;
+    }
 
     socket = io.connect('ws://' + options.socketAddress + ':' + options.socketPort, {
         'query': 'token=' + token
@@ -76,11 +82,11 @@ module.exports = function(options, callback) {
 
         console.log('Connected to port "' + options.port + '" (Baud rate: ' + options.baudrate + ')');
 
-        callback(null, socket, options.keyboards);
+        callback(null, socket, keyboards);
     });
 
     socket.on('serialport:error', function(options) {
-        callback(new Error('Error opening serial port "' + options.port + '"'), null, options.keyboards);
+        callback(new Error('Error opening serial port "' + options.port + '"'), null, keyboards);
     });
 
     socket.on('serialport:read', function(data) {

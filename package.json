@@ -1,13 +1,13 @@
 {
   "name": "cncjs-pendant-keyboard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A simple keyboard pendant for cncjs.",
-  "main": "./bin/cncjs-pendant-keyboard.js",
+  "main": "./bin/cncjs-pendant-keyboard",
   "engines": {
-    "node": ">=4"
+    "node": ">=18"
   },
   "bin": {
-    "cncjs-pendant-boilerplate": "./bin/cncjs-pendant-keyboard.js"
+    "cncjs-pendant-keyboard": "./bin/cncjs-pendant-keyboard"
   },
   "preferGlobal": true,
   "scripts": {
@@ -15,27 +15,25 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nsfilho/cncjs-pendant-keyboard.git"
+    "url": "git+https://github.com/jochenderwae/cncjs-pendant-keyboard.git"
   },
   "keywords": [
     "cncjs",
     "pendant",
     "keyboard"
   ],
-  "author": "Nelio Santos <nelio@e01aio.com.br>",
+  "contributors": ["Nelio Santos <nelio@e01aio.com.br>", "Jochen Derwae (https://github.com/jochenderwae)"],
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/nsfilho/cncjs-pendant-keyboard/issues"
-  },
   "homepage": "https://github.com/nsfilho/cncjs-pendant-keyboard#readme",
   "dependencies": {
-    "commander": "*",
-    "inquirer": "*",
-    "jsonwebtoken": "*",
-    "lodash.get": "*",
-    "node-hid": "*",
-    "serialport": "*",
-    "socket.io-client": "*",
-    "vorpal": "*"
+    "commander": "^5.0.0-4",
+    "inquirer": "^7.1.0",
+    "jsonwebtoken": "^8.5.1",
+    "lodash": "^4.17.15",
+    "node-hid": "^2.1.2",
+    "serialport": "^8.0.7",
+    "socket.io-client": "^2.3.0",
+    "vorpal": "^1.12.0",
+    "wtfnode": "^0.9.1"
   }
 }
