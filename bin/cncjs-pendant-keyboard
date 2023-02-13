@@ -9,11 +9,26 @@ var pkg = require("../package.json");
 var serverMain = require("../index");
 var hid = require("node-hid");
 var options = {};
+var process = require("child_process");
+    
+
+if (!String.prototype.format) {
+  String.prototype.format = function(dictionary) {
+    var dict = dictionary;
+    return this.replace(/{([a-zA-Z0-9_]+)}/g, function(match, id) { 
+      return typeof dict[id] != 'undefined'
+        ? dict[id]
+        : match
+      ;
+    });
+  };
+}
 
 program
     .version(pkg.version)
     .usage("-s <secret> -p <port> [options]")
     .option("-l, --list", "list available ports then exit")
+    .option("-k, --keyboards", "list available keyboards then exit")
     .option("-s, --secret", "the secret key stored in the ~/.cncrc file")
     .option("-p, --port <port>", "path or name of serial port")
     .option("-b, --baudrate <baudrate>", "baud rate (default: 115200)", 115200)
@@ -33,30 +48,43 @@ program
         "access token lifetime in seconds or a time span string (default: 30d)",
         "30d"
     );
-
+    
 program.parse(process.argv);
-
+var opts = program.opts();
 var options = {
-    secret: program.secret,
-    port: program.port,
-    baudrate: program.baudrate,
-    socketAddress: program.socketAddress,
-    socketPort: program.socketPort,
-    controllerType: program.controllerType,
-    accessTokenLifetime: program.accessTokenLifetime
+    secret: opts.secret,
+    port: opts.port,
+    baudrate: opts.baudrate,
+    socketAddress: opts.socketAddress,
+    socketPort: opts.socketPort,
+    controllerType: opts.controllerType,
+    accessTokenLifetime: opts.accessTokenLifetime
 };
 
-if (options.list) {
-    serialport.list(function(err, ports) {
-        if (err) {
-            console.error(err);
-            process.exit(1);
-        }
-        ports.forEach(function(port) {
-            console.log(port.comName);
-        });
+if (opts.keyboards) {
+    keyboardFilter = function(value, index, array) {
+      var i = array.findIndex(x => (x.vendorId == value.vendorId && x.productId == value.productId));
+      if(i >= index){
+        return true;
+      }
+      return false;
+    }
+    hid.devices().filter(keyboardFilter).forEach(function(device) {
+        console.log("vendorId: {vendorId}\nproductId: {productId}\nxinputName: keyboard:{manufacturer} {product}\n".format(device));
     });
     return;
+}
+
+if (opts.list) {
+    serialport.list().then(function(ports) {
+		ports.forEach(function(port) {
+			console.log(port.path);
+		});
+	}).catch((err) => {
+        console.error(err)
+        process.exit(1)
+    })
+	return;
 }
 
 var store = {
@@ -81,226 +109,189 @@ var kbdevent = {
     key: 0, // Normal keys
     extra: 0, // Advanced Keys or Special Keys
     repeating: 0, // If it is repating a movement
-    can_repeat: 1, // If can repeat
+    doRepeat: 1, // If can repeat
     move: 1, // Actually move size
-    default_move: 1 // Alter by F1, F2, F3
+    default_move: 1
 };
 
+
+
 var createServer = function(options) {
-    serverMain(options, function(err, socket) {
-        // Grbl
-        socket.on("Grbl:state", function(state) {
-            store.controller.state = state;
-        });
-        socket.on("Grbl:settings", function(settings) {
-            store.controller.settings = settings;
-        });
+    serverMain(options, function(err, socket, keyboards) {
+        if(socket) {
+            // Grbl
+            socket.on("Grbl:state", function(state) {
+                store.controller.state = state;
+            });
+            socket.on("Grbl:settings", function(settings) {
+                store.controller.settings = settings;
+            });
 
-        // Smoothie
-        socket.on("Smoothie:state", function(state) {
-            store.controller.state = state;
-        });
-        socket.on("Smoothie:settings", function(settings) {
-            store.controller.settings = settings;
-        });
+            // Smoothie
+            socket.on("Smoothie:state", function(state) {
+                store.controller.state = state;
+            });
+            socket.on("Smoothie:settings", function(settings) {
+                store.controller.settings = settings;
+            });
 
-        // TinyG
-        socket.on("TinyG:state", function(state) {
-            store.controller.state = state;
-        });
-        socket.on("TinyG:settings", function(settings) {
-            store.controller.settings = settings;
-        });
+            // TinyG
+            socket.on("TinyG:state", function(state) {
+                store.controller.state = state;
+            });
+            socket.on("TinyG:settings", function(settings) {
+                store.controller.settings = settings;
+            });
 
-        // Sender
-        socket.on("sender:status", function(data) {
-            store.sender.status = data;
-        });
+            // Sender
+            socket.on("sender:status", function(data) {
+                store.sender.status = data;
+            });
+        }
+        
+        if(keyboards && keyboards.length > 0) {
+            var keyboard = keyboards[0];
 
-        const findPath = interface =>
-            hid
-                .devices()
-                .find(
-                    item =>
-                        item.vendorId === 26881 &&
-                        item.productId === 9985 &&
-                        item.interface === interface
-                ).path;
-
-        console.log("Keyboard HID Address:", findPath(0), " & ", findPath(1));
-        var keyboard_main = new hid.HID(findPath(0));
-        var keyboard_extra = new hid.HID(findPath(1));
-
-        keyboard_main.on("data", function(data) {
-            var recv = data.toJSON().data;
-            var bits = recv.shift();
-            kbdevent.l_control = (bits & 1) !== 0;
-            kbdevent.l_shift = (bits & 2) !== 0;
-            kbdevent.l_alt = (bits & 4) !== 0;
-            kbdevent.l_meta = (bits & 8) !== 0;
-            kbdevent.r_control = (bits & 16) !== 0;
-            kbdevent.r_shift = (bits & 32) !== 0;
-            kbdevent.r_alt = (bits & 64) !== 0;
-            kbdevent.r_meta = (bits & 128) !== 0;
-            recv.shift();
-            kbdevent.key = recv.shift();
-            kbdevent.repeating = 0;
-            sendToController();
-        });
-
-        keyboard_extra.on("data", function(data) {
-            var recv = data.toJSON().data;
-            recv.shift();
-            kbdevent.extra = recv.shift();
-            kbdevent.repeating = 0;
-            sendToController();
-        });
-
-        function sendToController() {
-            // Calculate move size modifiers
-            kbdevent.move = kbdevent.default_move;
-            if (kbdevent.l_alt || kbdevent.r_alt) {
-                kbdevent.move = 0.1;
-            } else if (
-                kbdevent.l_shift ||
-                kbdevent.r_shift ||
-                kbdevent.r_meta
-            ) {
-                kbdevent.move = 10;
-            }
-
-            // Process pressed key
-            switch (kbdevent.extra) {
-                case 234: // vol+
-                    socket.emit(
-                        "write",
-                        options.port,
-                        "G91 Z-" + kbdevent.move + ";\n"
-                    );
-                    break;
-                case 233: // vol-
-                    socket.emit(
-                        "write",
-                        options.port,
-                        "G91 Z" + kbdevent.move + ";\n"
-                    );
-                    break;
-                case 131: // Media: Play (Top corner left)
-                    socket.emit("write", options.port, "G10 L20 P1 X0;\n");
-                    break;
-                case 138: // E-mail (Top corner left)
-                    socket.emit("write", options.port, "G10 L20 P1 Y0;\n");
-                    break;
-                case 226: // Mute (Top corner left)
-                    socket.emit("write", options.port, "G10 L20 P1 Z0;\n");
-                    break;
-                case 1: // Mouse Left (Top corner left)
-                    socket.emit(
-                        "write",
-                        options.port,
-                        "G10 L20 P1 X0 Y0 Z0;\n"
-                    );
-                    break;
-                case 148: // Key: Home -> Goto Zero-working position
-                    socket.emit("write", options.port, "G90 X0 Y0 Z0;\n");
-                    break;
-                default:
-                    break;
-            }
-            switch (kbdevent.key) {
-                case 80: // arrow: left
-                    socket.emit(
-                        "write",
-                        options.port,
-                        "G91 X-" + kbdevent.move + ";\n"
-                    );
-                    break;
-                case 79: // arrow: right
-                    socket.emit(
-                        "write",
-                        options.port,
-                        "G91 X" + kbdevent.move + ";\n"
-                    );
-                    break;
-                case 82: // arrow: up
-                    socket.emit(
-                        "write",
-                        options.port,
-                        "G91 Y" + kbdevent.move + ";\n"
-                    );
-                    break;
-                case 81: // arrow: down
-                    socket.emit(
-                        "write",
-                        options.port,
-                        "G91 Y-" + kbdevent.move + ";\n"
-                    );
-                    break;
-                case 58: // key: F1
-                    kbdevent.default_move = 0.1;
-                    break;
-                case 59: // key: F2
-                    kbdevent.default_move = 1;
-                    break;
-                case 60: // key: F3
-                    kbdevent.default_move = 10;
-                    break;
-                case 40: // Key: OK or Enter
-                    kbdevent.can_repeat = kbdevent.can_repeat ? 0 : 1;
-                default:
-                    break;
-            }
-
-            if (
-                (kbdevent.extra || kbdevent.key) &&
-                kbdevent.can_repeat &&
-                kbdevent.key != 40 && // Key: Enter / OK -- change repeat function
-                kbdevent.extra != 148 // Special Key: Home -- goto Zero-working position
-            ) {
-                if (!kbdevent.repeating) {
-                    kbdevent.repeating = 1;
-                    setTimeout(sendToController, 1000);
-                } else {
-                    setTimeout(sendToController, 150);
+            process.exec("xinput --disable \"" + keyboard.xinputName + "\"",
+                {env: {'DISPLAY': ':0','XAUTHORITY': '/run/user/1000/gdm/Xauthority'}},
+                (error, stdout, stderr) => {
+                if (error) {
+                    console.log(`error: ${error.message}`);
+                    return;
                 }
-            } else {
-                kbdevent.repeating = 0;
+                if (stderr) {
+                    console.log(`stderr: ${stderr}`);
+                    return;
+                }
+            });
+            
+            if(!keyboard.vendorId || !keyboard.productId) {
+                console.err("vendorId and productId need to be defined");
+                throw "vendorId and productId need to be defined";
             }
 
-            console.log(kbdevent);
+            const findPath = interface =>
+                hid
+                    .devices()
+                    .find(
+                        item =>
+                            item.vendorId === keyboard.vendorId &&
+                            item.productId === keyboard.productId &&
+                            item.interface === interface
+                    ).path;
+
+            var keyboard_main = new hid.HID(findPath(0));
+            var keyboard_extra = new hid.HID(findPath(1));
+            
+            
+            keyboard_main.on("data", function(data) {
+                var recv = data.toJSON().data;
+                var bits = recv.shift();
+                kbdevent.l_control = (bits & 1) !== 0;
+                kbdevent.l_shift = (bits & 2) !== 0;
+                kbdevent.l_alt = (bits & 4) !== 0;
+                kbdevent.l_meta = (bits & 8) !== 0;
+                kbdevent.r_control = (bits & 16) !== 0;
+                kbdevent.r_shift = (bits & 32) !== 0;
+                kbdevent.r_alt = (bits & 64) !== 0;
+                kbdevent.r_meta = (bits & 128) !== 0;
+                recv.shift();
+                kbdevent.key = recv.shift();
+                kbdevent.repeating = 0;
+                sendToController();
+            });
+
+            keyboard_extra.on("data", function(data) {
+                var recv = data.toJSON().data;
+                recv.shift();
+                kbdevent.extra = recv.shift();
+                kbdevent.repeating = 0;
+                sendToController();
+            });
+
+            function sendToController() {
+                var key = keyboard.keymap[kbdevent.extra] || keyboard.keymap[kbdevent.key];
+                var reset = kbdevent.extra == 0 && kbdevent.key == 0;
+                
+                if(!key) {
+                    return;
+                }
+                
+                if(key.amount) {
+                    kbdevent.default_move = key.amount;
+                }
+                
+                // Calculate move size modifiers
+                kbdevent.move = kbdevent.default_move;
+                if (kbdevent.l_alt || kbdevent.r_alt) {
+                    kbdevent.move = 0.1;
+                } else if (
+                    kbdevent.l_shift ||
+                    kbdevent.r_shift ||
+                    kbdevent.r_meta
+                ) {
+                    kbdevent.move = 10;
+                }
+                
+                if(key.grbl) {
+                    var command = key.grbl.format({amount:kbdevent.move});
+                    socket.emit("write", options.port, command + ";\n");
+                }
+                
+                if(key.command) {
+                    socket.emit('command', options.port, key.command);
+                }
+                
+                if(key.toggleRepeat) {
+                    kbdevent.doRepeat = kbdevent.doRepeat ? 0 : 1;
+                    // writing to hidraw gives "Cannot write to hid device" error
+                    // NoReport Page Bttn On/Off
+                    // 0x00     0x08 0x01 0x00/0x01
+                    // var res = keyboard_extra.write([0x00, 0x08, 0x01, kbdevent.can_repeat]);
+                    // console.log("result:", res);
+                }
+
+                if (key.canRepeat && kbdevent.doRepeat) {
+                    if (!kbdevent.repeating) {
+                        kbdevent.repeating = 1;
+                        setTimeout(sendToController, 1000);
+                    } else {
+                        setTimeout(sendToController, 150);
+                    }
+                } else {
+                    kbdevent.repeating = 0;
+                }
+
+            }
         }
     });
 };
 
-// console.log('List of connected devices (paths): ');
-// console.log('devices:', hid.devices());
 
 if (options.port) {
     createServer(options);
     return;
 }
 
-serialport.list(function(err, ports) {
-    if (err) {
-        console.error(err);
-        process.exit(1);
-    }
+
+serialport.list().then(function (ports) {
     const choices = ports.map(function(port) {
-        return port.comName;
+        return port.path;
     });
 
-    inquirer
-        .prompt([
-            {
-                type: "list",
-                name: "port",
-                message: "Specify which port you want to use?",
-                choices: choices
-            }
-        ])
-        .then(function(answers) {
-            options.port = answers.port;
+    inquirer.prompt([{
+        type: 'list',
+        name: 'port',
+        message: 'Specify which port you want to use?',
+        choices: choices
+    }]).then(function(answers) {
+        options.port = answers.port;
 
-            createServer(options);
-        });
-});
+        createServer(options);
+    });
+
+}).catch((err) => {
+    console.error(err);
+    process.exit(1);
+})
+
