@@ -117,7 +117,11 @@ description | Does functionally nothing, only used to add a description to the k
 Multiple properties of a keymap action can be filled in. If that's the case, they're processed in the order noted above.
 
 ## Menu based configuration: "Predefined keymaps"
-When setting up the keymap using the cncjs-pendant-keyboard menu, you can select the predefined keymaps to set the original layout (see: ![Hotkeys](https://raw.githubusercontent.com/nsfilho/cncjs-pendant-keyboard/master/docs/keysinfo.png)) or this layout:
+When setting up the keymap using the cncjs-pendant-keyboard menu, you can select the predefined keymaps to set:
+* the original layout 
+![Hotkeys](https://raw.githubusercontent.com/nsfilho/cncjs-pendant-keyboard/master/docs/keysinfo.png)
+* or this layout
+
 ```
 ┌──────┬──────┬──────┬──────┐
 │Repeat│  x10 │  x1  │  x.1 │
